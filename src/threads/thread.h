@@ -88,11 +88,16 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
+    int origin_prior;
+
+    int64_t sleep_ticks;                    //the time a thread need to wait
+
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-
+    struct list locks;
+    struct lock* waiting_lock;
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -118,6 +123,10 @@ tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
+
+void thread_checksleep (struct thread *, void* aux);//added
+//void list_add_prior(struct list* ,struct list_elem*);
+bool thread_cmp(const struct list_elem*,const struct list_elem*,void*);
 
 struct thread *thread_current (void);
 tid_t thread_tid (void);
