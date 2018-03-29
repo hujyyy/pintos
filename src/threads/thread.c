@@ -59,6 +59,8 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
 
+fp load_avg;
+
 static void kernel_thread (thread_func *, void *aux);
 
 static void idle (void *aux UNUSED);
@@ -78,11 +80,35 @@ static tid_t allocate_tid (void);
 //////////////////////////////////////////////////////
 /////newly implemented func///////////////////////////
 //check if the given thread is sleeping or not. if not, unblock it
-void thread_checksleep(struct thread *t, void* aux){
+void thread_checksleep(struct thread *t, void* aux UNUSED){
   if(t->status==THREAD_BLOCKED&&t->sleep_ticks>0){
     if(--(t->sleep_ticks)==0) thread_unblock(t);
   }
 
+}
+void thread_update_cpu(struct thread *t,void* aux UNUSED){
+  ASSERT(thread_mlfqs);
+  fp tmp = FP_DIV(2*load_avg,FP_ADD(2*load_avg,1));
+  t->recent_cpu = FP_ADD(FP_MULT(tmp,t->recent_cpu),t->nice);
+
+}
+
+void thread_update_prior(struct thread *t, void* aux UNUSED){
+  ASSERT(thread_mlfqs);
+  if(t==idle_thread) return;
+  t->priority = FP_TO_INT(-FP_SUB(t->recent_cpu/4,(PRI_MAX - t->nice*2)));
+  if(t->priority>PRI_MAX) t->priority = PRI_MAX;
+  if(t->priority<PRI_MIN) t->priority = PRI_MIN;
+
+}
+
+void update_load_avg(){
+  ASSERT(thread_mlfqs);
+  int num_ready = list_size(&ready_list);
+  if(thread_current()!=idle_thread) num_ready++;
+
+  load_avg =(fp) 59*load_avg/60 + INT_TO_FP(num_ready)/60;
+  //printf("%d\n",load_avg);
 }
 
 // void list_add_prior(struct list* lst, struct list_elem* elm){
@@ -154,6 +180,7 @@ void printlist (struct list* lst){
 }
 
 struct list* getreadylist(){return &ready_list;}
+struct thread* getidle() {return idle_thread;}
 ///////////////////////////////////////////////////
 //////////////////////////////////////////////////
 
@@ -175,6 +202,8 @@ void
 thread_init (void)
 {
   ASSERT (intr_get_level () == INTR_OFF);
+
+  load_avg = INT_TO_FP(0);
 
   lock_init (&tid_lock);
   list_init (&ready_list);
@@ -296,9 +325,10 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
+
   //printlist(getreadylist());
   //if a newly created thread has a higher priority, call yeild to preempt it
-  if(t->priority>thread_current()->priority) thread_yield();
+  if(thread_mlfqs==false&&t->priority>thread_current()->priority) thread_yield();
 
 
     return tid;
@@ -444,6 +474,7 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority)
 {
+  if(thread_mlfqs) return;//cannot set priority mannully in mlfqs mode
   struct thread* cur = thread_current ();
 
 
@@ -479,33 +510,37 @@ thread_get_priority (void)
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED)
+thread_set_nice (int nice)
 {
-  /* Not yet implemented. */
+  struct thread* cur = thread_current();
+  cur->nice = nice;
+  thread_update_prior(cur,0);
+  if(!list_empty(&ready_list)&&\
+  list_entry(list_front(&ready_list),struct thread,elem)->priority>=cur->priority){
+    thread_yield();
+  }
+
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void)
 {
-  /* Not yet implemented. */
-  return 0;
+  return thread_current()->nice;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void)
 {
-  /* Not yet implemented. */
-  return 0;
+  return FP_TO_INT(load_avg*100);
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void)
 {
-  /* Not yet implemented. */
-  return 0;
+  return FP_TO_INT(thread_current()->recent_cpu*100);
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -596,8 +631,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   t->sleep_ticks = 0; //initialize sleep_ticks as 0
   t->waiting_lock = NULL;
+  t->nice = 0;
+  t->recent_cpu = INT_TO_FP(0);
   list_init(&t->locks);
   list_push_back (&all_list, &t->allelem);
+  if(thread_mlfqs) thread_update_prior(t,0);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

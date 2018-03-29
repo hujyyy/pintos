@@ -118,18 +118,20 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
+  sema->value++;
   if (!list_empty (&sema->waiters)){
     // struct thread* tp = list_entry(list_begin(&sema->waiters),struct thread,elem);
     // printf("%d\n",tp->priority);
     list_sort(&sema->waiters,(list_less_func*)thread_cmp,NULL);
-    struct thread* tmp=list_entry (list_pop_front (&sema->waiters),struct thread, elem);
-    thread_unblock(tmp);
-    //thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                //struct thread, elem));
-                              }
-  sema->value++;
+    //struct thread* tmp=list_entry (list_pop_front (&sema->waiters),struct thread, elem);
+    //thread_unblock(tmp);
+    thread_unblock (list_entry (list_pop_front (&sema->waiters),
+                                struct thread, elem));
+    thread_yield();
+  }
+  //sema->value++;
 
-  thread_yield();       //call yeild after release to reschedule
+  //thread_yield();       //call yeild after release to reschedule
 
   intr_set_level (old_level);
 
@@ -218,6 +220,7 @@ lock_acquire (struct lock *lock)
   struct thread* cur = thread_current();
   enum intr_level old_level = intr_disable ();
 
+  if(!thread_mlfqs){
   if(lock->holder==NULL){//if the current lock has no holder
     lock->prior = 0;
   } else{//if the current lock already had a holder,we try to donate
@@ -227,6 +230,7 @@ lock_acquire (struct lock *lock)
     // list_insert_ordered(&lock->semaphore.waiters,&lock->holder->elem,(list_less_func*)thread_cmp,NULL);
 
   }
+ }
 
   sema_down (&lock->semaphore);
 
@@ -276,7 +280,7 @@ lock_release (struct lock *lock)
   //enum intr_level old_level = intr_disable ();
   list_remove(&lock->l_elem);
 
-
+  if(!thread_mlfqs){
   if (!list_empty(&cur->locks)){
       struct lock* prior_lock = list_entry(list_begin(&cur->locks),struct lock,l_elem);
       cur->priority = max(prior_lock -> prior,cur->origin_prior);
@@ -284,7 +288,7 @@ lock_release (struct lock *lock)
     //printf("%s\n",cur->name );
     cur->priority = cur->origin_prior;
   }
-
+}
   //cur->priority = cur->origin_prior;
 
 
@@ -401,39 +405,42 @@ cond_broadcast (struct condition *cond, struct lock *lock)
 
 /////////////////////////////////////////////////////////
 //////////////newly implemented/////////////////////
-void list_add_lock(struct list* lst, struct list_elem* elm){
-    //printf("%s\n",list_entry (elm, struct thread, elem)->name);
-    ASSERT(lst!=NULL);
-    ASSERT(elm!=NULL);
-
-    struct list_elem* ele_ptr;
-    int prior;
-    struct lock* lock = list_entry (elm, struct lock, l_elem);
-    int new_prior = lock -> prior;
-
-    //if the list is empty, just push from the back
-    if(list_empty(lst)) {
-      list_push_back(lst,elm);
-      //printlist(lst);
-      return;
-    }
-
-    for(ele_ptr = list_begin(lst);ele_ptr!=list_end(lst);ele_ptr=list_next(ele_ptr)){
-      prior = list_entry (ele_ptr, struct lock, l_elem)->prior;
-      if(new_prior>prior) {
-        list_insert(ele_ptr,elm);
-        return;}
-    }
-    //if none of the above is excuted, we should insert it before the last elem
-    list_push_back(lst,elm);
-
-
-    return;
-}
+// void list_add_lock(struct list* lst, struct list_elem* elm){
+//     //printf("%s\n",list_entry (elm, struct thread, elem)->name);
+//     ASSERT(lst!=NULL);
+//     ASSERT(elm!=NULL);
+//
+//     struct list_elem* ele_ptr;
+//     int prior;
+//     struct lock* lock = list_entry (elm, struct lock, l_elem);
+//     int new_prior = lock -> prior;
+//
+//     //if the list is empty, just push from the back
+//     if(list_empty(lst)) {
+//       list_push_back(lst,elm);
+//       //printlist(lst);
+//       return;
+//     }
+//
+//     for(ele_ptr = list_begin(lst);ele_ptr!=list_end(lst);ele_ptr=list_next(ele_ptr)){
+//       prior = list_entry (ele_ptr, struct lock, l_elem)->prior;
+//       if(new_prior>prior) {
+//         list_insert(ele_ptr,elm);
+//         return;}
+//     }
+//     //if none of the above is excuted, we should insert it before the last elem
+//     list_push_back(lst,elm);
+//
+//
+//     return;
+// }
 
 //donate from the thread having waiting lock wlock with priority prior to thread t
 void donate_prior(struct thread* t,int prior,struct lock* wlock){
   ASSERT(t!=NULL);
+
+  ASSERT(!thread_mlfqs);//donation is disabled in mlfqs mode
+
   wlock->prior = wlock->prior<prior?prior:wlock->prior;
   if(prior<=t->priority) return;
   else{
@@ -445,25 +452,26 @@ void donate_prior(struct thread* t,int prior,struct lock* wlock){
 
 //call if the priority of the thread with waiting_lock wlock lower its pripority
 //which means we might need to change the priority of those threads it donated to
-void donate_relax(struct thread* t,int prior,struct lock* wlock){
-  ASSERT(t!=NULL);
+// void donate_relax(struct thread* t,int prior,struct lock* wlock){
+//   ASSERT(t!=NULL);
+//   ASSERT(thread_mlfqs==false);
+//   int prev_priority = t->priority;
+//   //update the priority of the current lock
+//   struct thread* max_doner = list_entry(list_begin(&wlock->semaphore.waiters),struct thread,elem);
+//   if(max_doner->priority > prior) wlock->prior = max(max_doner->priority,t->origin_prior);
+//
+//   struct lock* prior_lock = list_entry(list_begin(&t->locks),struct lock,l_elem);
+//   t->priority = max(prior_lock->prior,wlock->prior);
+//
+//
+//   //if the priority decrease, we may need to do the relaxion recursively
+//   if(t->priority<prev_priority&&t->waiting_lock!=NULL){
+//     list_remove(&t->elem);
+//     list_insert_ordered(&t->waiting_lock->semaphore.waiters,&t->elem,(list_less_func*)thread_cmp,NULL);
+//     donate_relax(t->waiting_lock->holder,t->priority,t->waiting_lock);
+//   }
+// }
 
-  int prev_priority = t->priority;
-  //update the priority of the current lock
-  struct thread* max_doner = list_entry(list_begin(&wlock->semaphore.waiters),struct thread,elem);
-  if(max_doner->priority > prior) wlock->prior = max(max_doner->priority,t->origin_prior);
-
-  struct lock* prior_lock = list_entry(list_begin(&t->locks),struct lock,l_elem);
-  t->priority = max(prior_lock->prior,wlock->prior);
-
-
-  //if the priority decrease, we may need to do the relaxion recursively
-  if(t->priority<prev_priority&&t->waiting_lock!=NULL){
-    list_remove(&t->elem);
-    list_insert_ordered(&t->waiting_lock->semaphore.waiters,&t->elem,(list_less_func*)thread_cmp,NULL);
-    donate_relax(t->waiting_lock->holder,t->priority,t->waiting_lock);
-  }
-}
  /* priority compare function. */
  bool lock_cmp (struct list_elem *a, struct list_elem *b, void* aux)
  {

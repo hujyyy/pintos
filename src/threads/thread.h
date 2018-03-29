@@ -24,6 +24,23 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+
+//define all the calculation of Floating points
+typedef int fp;
+
+#define Q 14
+#define INT_TO_FP(N)((fp)N<<Q)
+#define FP_TO_INTZ(X)(X>>Q)
+#define FP_TO_INT(X) \
+  (X>=0?(X+(1<<(Q-1)))>>Q :(X-(1<<(X-1)))>>Q )
+#define FP_ADD(X,N)( X+(N<<Q) )
+#define FP_SUB(X,N)( X-(N<<Q) )
+#define FP_MULT(X,Y)( (((int64_t)X) * Y)>>Q )
+#define FP_DIV(X,Y) ( (((int64_t)X)<<Q)/Y )
+
+
+
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -98,6 +115,9 @@ struct thread
     struct list_elem elem;              /* List element. */
     struct list locks;
     struct lock* waiting_lock;
+    int nice;
+    fp recent_cpu;
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -124,7 +144,12 @@ tid_t thread_create (const char *name, int priority, thread_func *, void *);
 void thread_block (void);
 void thread_unblock (struct thread *);
 
-void thread_checksleep (struct thread *, void* aux);//added
+void thread_checksleep (struct thread *, void* aux UNUSED);//added
+void thread_update_cpu (struct thread *, void* aux UNUSED);
+void thread_update_prior(struct thread *, void* aux UNUSED);
+
+//update the load average
+void update_load_avg(void);
 //void list_add_prior(struct list* ,struct list_elem*);
 bool thread_cmp(const struct list_elem*,const struct list_elem*,void*);
 

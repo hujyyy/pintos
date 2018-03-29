@@ -181,6 +181,20 @@ timer_interrupt (struct intr_frame *args UNUSED)
   thread_tick ();
   //check all the existed thread and unblock the asleep threads that need to be awake
   thread_foreach(thread_checksleep,0);
+  if(thread_mlfqs){
+    struct thread* cur = thread_current();
+    if(cur!=getidle()) cur->recent_cpu=FP_ADD(cur->recent_cpu,1);
+
+    if(ticks%TIMER_FREQ==0) {
+      update_load_avg();
+      thread_foreach(thread_update_cpu,0);
+    }
+    if(ticks%4==0) {
+      thread_foreach(thread_update_prior,0);
+      list_sort(getreadylist(),(list_less_func*)thread_cmp,NULL);
+    }
+  }
+
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

@@ -37,6 +37,8 @@ bool lock_held_by_current_thread (const struct lock *);
 bool lock_cmp (struct list_elem*, struct list_elem*, void*);
 bool cond_cmp (const struct list_elem*, const struct list_elem*, void *);
 
+void donate_prior(struct thread*,int,struct lock*);
+
 int max(int a,int b);
 /* Condition variable. */
 struct condition
