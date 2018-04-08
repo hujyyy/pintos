@@ -48,11 +48,8 @@ ready list.
 >> A3: What steps are taken to minimize the amount of time spent in
 >> the timer interrupt handler?
 
-To minimise the time spent in timer_interrupt(), we have decided to use an ordered list of threads
-waiting to be woken up. This allows us to only iterate over the list until a thread whose number of ticks
-needed to be woken up is superior to the current number of ticks. Once this happens, we exit the loop using a
-break statement. This is more effient than looping through all the threads using the thread_foreach()
-method.
+To minimise the time spent in timer_interrupt(), we call thread_foreach() to iterate the thread list
+and for each thread, we check the state by calling thread_checksleep(), where we only check those blocked threads.
 
 ---- SYNCHRONIZATION ----
 
@@ -154,7 +151,11 @@ and having been waiting for this released lock before.
 >> how your implementation avoids it.  Can you use a lock to avoid
 >> this race?
 
-????
+Potential race: When a lower priority thread A hold the lock and another thread with higher priority acquire this lock
+at the time thread A compare its priority with thread B and want to give the lock to B, another thread C with priority higher than
+B acquire lock A this time. So here occurs a potential race.
+In our implement, we force only one thread could acquire lock, so that no race could occur.
+Can't use lock to avoid this race, because this race due to the lock_acquire operation, lock can't solve this problem.
 
 
 ---- RATIONALE ----
@@ -226,7 +227,10 @@ Put less code inside the interrupt context so that it can only be executed if ne
 >> time to work on this part of the project, how might you choose to
 >> refine or improve your design?
 
-????
+disadvantages: running time could further improve (too many operations in timer_interrupt())
+advantages: no other extra data structure, codes are simple to understand
+
+Extra work : reduce some work in timer_interrupt(), also break some thread instead of using thread_foreach()
 
 
 >> C6: The assignment explains arithmetic for fixed-point math in
@@ -236,7 +240,10 @@ Put less code inside the interrupt context so that it can only be executed if ne
 >> type and/or a set of functions or macros to manipulate fixed-point
 >> numbers, why did you do so?  If not, why not?
 
-define a abstract data type df,
+Define a abstract data type df
+Because there are no float operations in this program, so a abstraction layer could use some bit of the number
+to represent the float to operate, macros is more effective to handle abstract data type layer than functions.
+macros would be replaced in the compiling step, which shorten the running time.
 
 
 			   SURVEY QUESTIONS
