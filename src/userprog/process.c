@@ -17,9 +17,8 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-
+//static void testss();
 static thread_func start_process NO_RETURN;
-static void tests();
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
 /* Starts a new thread running a user program loaded from
@@ -38,58 +37,32 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
-  char* name, *tmp;
-  name = strtok_r(file_name," ",&tmp);
+
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (name, PRI_DEFAULT, start_process, fn_copy);
-  //thread_yield();
+  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
-  //printf("hhhhhhhhhhhhh\n");
   return tid;
 }
 
 /* A thread function that loads a user process and starts it
    running. */
-   static void tests(){while(1)printf("hhhhhhh\n");}
+// static void testss(){
+//   printf("xxxx\n" );
+// }
 static void
 start_process (void *file_name_)
 {
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
-  printf("hhh\n");
-
-  char* token = NULL,*remain = NULL;
-  token = strtok_r(file_name," ",&remain);
+  //printf("xxxx\n");
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (token, &if_.eip, &if_.esp);
-  //hex_dump(0,if_.esp,128,true);
-
-
-  // char* esp = (char*)if_.esp;
-  // char* argv[128];
-  // int argc = 0;
-  // while(token!=NULL){
-  //   token = strtok_r(NULL," ",&remain);
-  //   esp -= strlen(token)+1;
-  //   strlcpy(esp,token,strlen(token)+2);
-  //   argv[argc++] = esp;
-  // }
-  // while((int)esp%4!=0) esp--;
-  // int* esp2 = esp - 4;
-  // *esp2-- = 0;
-  // for(int i = argc-1;i>=0;i--) *esp2-- = (int *) argv[i];
-  // *esp2-- = esp2 + 1;
-  // *esp2-- = argc;
-  // *esp2 = 0;
-  // if_.esp = esp2;
-
-
+  success = load (file_name, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -143,7 +116,6 @@ process_exit (void)
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
-      //printf ("%s: exit(%d)\n", cur->name,cur->ret_value);
     }
 }
 

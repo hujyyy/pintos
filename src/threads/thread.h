@@ -106,7 +106,7 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     int origin_prior;
-    int ret_value;
+
     int64_t sleep_ticks;                    //the time a thread need to wait
 
     struct list_elem allelem;           /* List element for all threads list. */
