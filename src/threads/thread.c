@@ -326,11 +326,9 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
-  //printlist(getreadylist());
   //if a newly created thread has a higher priority, call yeild to preempt it
   if(thread_mlfqs==false&&t->priority>thread_current()->priority) thread_yield();
-
-  //printf("hhhh\n");
+  printf("hhhhh\n");
     return tid;
 }
 
@@ -345,7 +343,6 @@ thread_block (void)
 {
   ASSERT (!intr_context ());
   ASSERT (intr_get_level () == INTR_OFF);
-
   thread_current ()->status = THREAD_BLOCKED;
   schedule ();
 }
@@ -447,6 +444,7 @@ thread_yield (void)
     //list_add_prior(&ready_list, &cur->elem);
     //list_push_back (&ready_list, &cur->elem);
   }
+  //printlist(&ready_list);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
