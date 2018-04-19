@@ -330,7 +330,7 @@ thread_create (const char *name, int priority,
   //if a newly created thread has a higher priority, call yeild to preempt it
   if(thread_mlfqs==false&&t->priority>thread_current()->priority) thread_yield();
 
-
+  //printf("hhhh\n");
     return tid;
 }
 
@@ -447,7 +447,6 @@ thread_yield (void)
     //list_add_prior(&ready_list, &cur->elem);
     //list_push_back (&ready_list, &cur->elem);
   }
-
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);

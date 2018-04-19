@@ -127,11 +127,14 @@ sema_up (struct semaphore *sema)
     //thread_unblock(tmp);
     thread_unblock (list_entry (list_pop_front (&sema->waiters),
                                 struct thread, elem));
-    thread_yield();
+    //thread_yield();
   }
   //sema->value++;
-
+ 
   //thread_yield();       //call yeild after release to reschedule
+
+
+
 
   intr_set_level (old_level);
 
