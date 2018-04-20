@@ -41,6 +41,7 @@ process_execute (const char *file_name)
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
+//printf("hhh\n" );
   return tid;
 }
 
@@ -73,23 +74,27 @@ start_process (void *file_name_)
 
   while(token!=NULL){
     esp-= strlen(token)+1;
-    strlcpy(esp,token,strlen(token)+1);
     //if(argc==4) PANIC("%x %s",esp,token);
+    strlcpy(esp,token,strlen(token)+1);
     argv[argc++] = esp;
     token = strtok_r(NULL," ",&remain);
   }
 
+
+  //PANIC("%x\n",esp);
   while((int)esp%4!=0) esp--;
   //PANIC("%x",esp);
   int* esp2 = esp - 4;
   *esp2-- = 0;
-  for(int i = argc-1;i>=0;i--) *esp2-- = (int *) argv[i];
-  *esp2-- = esp2 + 1;
+  for(int i = argc-1;i>=0;i--) {
+    *esp2-- = (int *) argv[i];
+  }
+  //PANIC("%x %x",esp2+1,*(esp2+1));
+  *esp2-- = esp2+2;
   *esp2-- = argc;
   *esp2 = 0;
 
   if_.esp = esp2;
-
   //hex_dump(if_.esp,if_.esp,48,false);
 
   /* If load failed, quit. */
@@ -121,6 +126,10 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED)
 {
+  //printlist(getreadylist());
+  //printf("%d\n",thread_current()->priority );
+  //if(child_tid!=3)PANIC("%d",child_tid);
+  while(1);
   return -1;
 }
 
