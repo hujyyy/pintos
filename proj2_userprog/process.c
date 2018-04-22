@@ -36,12 +36,14 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
-
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  char* name,*tmp;
+  name = strtok_r(file_name," ",&tmp);
+  tid = thread_create (name, PRI_DEFAULT, start_process, fn_copy);
+
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
-//printf("hhh\n" );
+
   return tid;
 }
 
@@ -67,6 +69,27 @@ start_process (void *file_name_)
   token = strtok_r(file_name," ",&remain);
   //success = true;
   success = load (token, &if_.eip, &if_.esp);
+
+
+  struct thread* cur = thread_current();
+
+/* If load failed, quit. */
+//printf("%d\n",cur->tid );
+
+  if (!success){
+    cur->tid = -1;
+    cur->exit_code = -1;
+    palloc_free_page (file_name);
+    //printf("%d\n",cur->tid );
+    sema_up(&cur->parent->execsema);
+    //printf("%d\n",cur->tid );
+    thread_exit ();
+  }
+  cur->file_opened = filesys_open(token);
+  file_deny_write(cur->file_opened);
+
+  sema_up(&cur->parent->execsema);
+
 
   char* esp = (char*)if_.esp;
   char* argv[512];
@@ -96,13 +119,9 @@ start_process (void *file_name_)
 
   if_.esp = esp2;
   //hex_dump(if_.esp,if_.esp,48,false);
-
-  /* If load failed, quit. */
   palloc_free_page (file_name);
-  //if(success)PANIC("rend");
 
-  if (!success)
-    thread_exit ();
+
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -124,20 +143,29 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED)
+process_wait (tid_t child_tid)
 {
-  //printlist(getreadylist());
-  //printf("%d\n",thread_current()->priority );
-  //if(child_tid!=3)PANIC("%d",child_tid);
-  while(1);
-  return -1;
+  struct thread* cur = thread_current();
+  struct thread* child_thd = getthread(child_tid);
+  //PANIC("dassdjksajdlajs%d",child_thd->parent);
+  //if(child_thd==NULL) return 0;
+  if(child_thd==NULL||child_thd->parent!=cur\
+  ||child_thd->being_waited) {
+    //PANIC("%d",child_tid);
+    return -1;
+  }
+  child_thd -> being_waited = true;
+
+  sema_down(&cur->waitsema);
+  tid_t child_exitcode = child_thd->exit_code;
+  return child_exitcode;
 }
 
 /* Free the current process's resources. */
 void
 process_exit (void)
 {
-  struct thread *cur = thread_current ();
+  struct thread *cur = thread_current();
   uint32_t *pd;
 
   /* Destroy the current process's page directory and switch back
@@ -152,10 +180,20 @@ process_exit (void)
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
+      printf ("%s: exit(%d)\n", cur->name,cur->exit_code);
+
+      if(cur->file_opened!=NULL){
+        file_allow_write(cur->file_opened);
+        file_close(cur->file_opened);
+      }
+      files_release();
+      if(cur->parent!=NULL&&cur->being_waited){
+        sema_up(&cur->parent->waitsema);
+        //sema_down(&cur->waitsema);
+      }
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
-      //printf ("%s: exit(%d)\n", cur->name,cur->exit_code);
     }
 }
 
