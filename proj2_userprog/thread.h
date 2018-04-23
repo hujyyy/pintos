@@ -91,7 +91,6 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
-
     //for project2 userprog
     int exit_code;
     struct list files_list;
@@ -101,6 +100,9 @@ struct thread
     struct semaphore waitsema;
     int maxfd;
     struct file* file_opened;
+    struct list children_legacy;
+
+
 
 
     /* Shared between thread.c and synch.c. */
@@ -161,5 +163,9 @@ struct file_info{
   struct file* file;
 };
 void files_release(void);
+void push_legacy(void);
+void free_legacylist(void);
+int  get_chilidlegacy(tid_t tid);
+
 
 #endif /* threads/thread.h */

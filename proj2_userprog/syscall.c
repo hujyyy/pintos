@@ -37,9 +37,7 @@ void check_memory(void *ptr);
 void
 syscall_init (void)
 {
-
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-
 }
 
 
@@ -53,7 +51,7 @@ syscall_handler (struct intr_frame *f)
   int sys_num = *(int*)(f->esp);
   int32_t *ptr = f->esp;
 
-  //if(sys_num>10)printf("%d\n", sys_num);
+  //printf("%d\n", sys_num);
   switch (sys_num) {
 
     case SYS_HALT:{
@@ -64,7 +62,6 @@ syscall_handler (struct intr_frame *f)
 
     case SYS_EXIT:{
       /* Terminate this process. */
-
       check_memory(ptr+1);
       int status = *((int *)ptr+1);
       if (status!=-1) f->eax = 0;
@@ -73,7 +70,6 @@ syscall_handler (struct intr_frame *f)
 
     case SYS_EXEC:{
       /* Start another process. */
-      check_memory(ptr+1);
       char* cmd_line = (char*)*(ptr+1);
       pid_t pid = syscall_exec(cmd_line);
       f->eax = pid;
@@ -234,7 +230,6 @@ pid_t syscall_exec(const char* cmd_line){
     //printf("a %d\n",thd->tid );
     struct thread* cur = thread_current();
     sema_down(&cur->execsema);
-    //PANIC("%d",thd->tid);
     //printf("a %d\n",thd->tid );
 
     free(file_name);

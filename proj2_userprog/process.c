@@ -77,6 +77,7 @@ start_process (void *file_name_)
 //printf("%d\n",cur->tid );
 
   if (!success){
+    //PANIC("LOAD FAILED");
     cur->tid = -1;
     cur->exit_code = -1;
     palloc_free_page (file_name);
@@ -145,18 +146,31 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid)
 {
+  //printf("%d\n",child_tid );
   struct thread* cur = thread_current();
+
   struct thread* child_thd = getthread(child_tid);
+
   //PANIC("dassdjksajdlajs%d",child_thd->parent);
   //if(child_thd==NULL) return 0;
-  if(child_thd==NULL||child_thd->parent!=cur\
+  if(child_thd==NULL) return get_chilidlegacy(child_tid);
+  if(child_thd->parent!=cur\
   ||child_thd->being_waited) {
     //PANIC("%d",child_tid);
     return -1;
   }
-  child_thd -> being_waited = true;
+  //printf("%d\n",child_tid );
 
-  sema_down(&cur->waitsema);
+  child_thd -> being_waited = true;
+  //PANIC("wait %d",child_tid);
+  //if(child_thd->status!=THREAD_DYING)
+  //tid_t child_exitcode = get_chilidlegacy(child_tid);
+  // if(child_exitcode!=-1) {
+  //   return child_exitcode;
+  // }
+  //printf("%d\n",child_thd->waitsema.value );
+  sema_down(&child_thd->waitsema);
+  //if(child_tid>4)PANIC("%d",thread_current()->tid);
   tid_t child_exitcode = child_thd->exit_code;
   return child_exitcode;
 }
@@ -181,16 +195,18 @@ process_exit (void)
          directory, or our active page directory will be one
          that's been freed (and cleared). */
       printf ("%s: exit(%d)\n", cur->name,cur->exit_code);
-
+      //PANIC("%d",thread_current()->tid);
       if(cur->file_opened!=NULL){
         file_allow_write(cur->file_opened);
         file_close(cur->file_opened);
       }
       files_release();
       if(cur->parent!=NULL&&cur->being_waited){
-        sema_up(&cur->parent->waitsema);
+        sema_up(&cur->waitsema);
         //sema_down(&cur->waitsema);
       }
+      push_legacy();
+      free_legacylist();
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);

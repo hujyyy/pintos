@@ -295,7 +295,8 @@ thread_exit (void)
 #ifdef USERPROG
   process_exit ();
 #endif
-
+//ASSERT(thread_current()->exit_code!=-1);
+  //printf("%d\n",thread_current()->exit_code );
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
@@ -480,6 +481,7 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&t->execsema,0);
   sema_init(&t->waitsema,0);
   t->maxfd = 1;
+  list_init(&t->children_legacy);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -626,7 +628,8 @@ struct file_info* getfileinfo(int fd){
 
 }
 struct list* get_alllist(void){return &all_list;}
-void files_release(){
+
+void files_release(void){
   struct thread* cur = thread_current();
   struct list_elem* p;
   while (!list_empty(&cur->files_list)) {
@@ -636,6 +639,40 @@ struct list* get_alllist(void){return &all_list;}
     free(fi);
   }
   return;
+}
+
+void push_legacy(void){
+  struct thread* cur = thread_current();
+  //ASSERT(cur->tid>0);
+  if(cur->parent==NULL) return;
+  struct legacy* leg = (struct legacy*)malloc(sizeof(struct legacy));
+  leg->tid = cur->tid;
+  leg->exit_code = cur->exit_code;
+  //list_remove(&leg->myelem);
+  list_push_back(&cur->parent->children_legacy,&leg->myelem);
+
+}
+
+void free_legacylist(void){
+  struct thread* cur = thread_current();
+  struct list_elem* p;
+  while (!list_empty(&cur->files_list)) {
+    p = list_pop_front(&cur->files_list);
+    struct legacy* leg =  list_entry (p, struct legacy, myelem);
+    free(leg);
+  }
+  return;
+}
+
+int get_chilidlegacy(tid_t tid){
+  struct thread* cur = thread_current();
+  struct list_elem* tmp;
+  if(list_empty(&cur->children_legacy)) return -1;
+  for(tmp = list_begin(&cur->children_legacy);tmp!=list_end(&cur->children_legacy);tmp=list_next(tmp)){
+    struct legacy* leg =  list_entry (tmp, struct legacy, myelem);
+    if(leg->tid == tid) return leg->exit_code;
+  }
+  return -1;
 }
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
